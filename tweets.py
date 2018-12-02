@@ -86,7 +86,7 @@ def extract_mentions(text: str) -> List[str]:
 
 def extract_hashtags(text: str) -> List[str]:
     """Return a list of all unique hashtags in text, in the order in which they appear
-    in text, converted to lowercase. 
+    in text, converted to lowercase.
     @type text:str
     @rtype: list
     >>> etract_hashtag('In #December we have #christmas')
@@ -111,18 +111,21 @@ def count_words(text: str, count_dict: Dict[str, int]) -> None:
     @rtype: Node
     >>> count_dict = {}
     >>> count_words('This is a Simple? tweet and a nice one',count_dict)
-    >>> 
+    >>>
     """
-    word_list = [clean_word(word) for word in text.split(" ")]
+    text_list = [word for word in text.split(" ")]
+    for word in text_list:
+        if word[0] == HASH_SYMBOL or word[0] == MENTION_SYMBOL:
+            text_list.remove(word)
+    word_list = [clean_word(word) for word in text_list]
     for word in word_list:
         if word not in count_dict:
             count_dict[word] = 1
         else:
             count_dict[word] = count_dict[word] + 1
-    return None
 
 
-def common_words(count_dict: Dict[str, int], N: int) -> None:
+def common_words(count_dict: Dict[str, int], number: int) -> None:
     """Updates a dictionary so that it only includes the most common words.
     At most N words should be kept in the dictionary.
     @type count_dict:Dict[str:int]
@@ -138,7 +141,7 @@ def common_words(count_dict: Dict[str, int], N: int) -> None:
         for key in count_dict:
             if count_dict[key] == value:
                 sorted_collection.append((key, value))
-    end_index = N-1
+    end_index = number-1
     if len(sorted_collection) == 0 or len(sorted_collection) == 1:
         return None
     else:
@@ -155,11 +158,12 @@ def common_words(count_dict: Dict[str, int], N: int) -> None:
 
 
 def read_tweets(file: TextIO) -> Dict[str, List[tuple]]:
+    """Takes input from a file and processes it into a dictionary of
+    tweets
+    """
     file_content = file.readlines()
     file_content = list(filter(None, file_content))
-    file.close()
     content_dict = {}
-    tweet_dict = {}
     keys = []
     for line in file_content:
         if len(line) > 0 and line[len(line) - 2] == ":":
@@ -174,23 +178,27 @@ def read_tweets(file: TextIO) -> Dict[str, List[tuple]]:
                 break
             index += 1
         del file_content[0:index + 1]
+    return tweet_tuple(content_dict)
+
+
+def tweet_tuple(content_dict: Dict[str, List[str]]) -> Dict[str, List[tuple]]:
+    """Returns a dictionary of tweets in an ordered format
+    @type content_dict: Dict[str, List[str]]
+    @rtype: Dict[str, List[tuple]]
+    """
+    tweet_dict = {}
     for key in content_dict:
-        count = 0
         item = content_dict[key]
         info = item[0].split(',')
-        tweet_text = ','.join(item[1:])
-        tweet_text = tweet_text.rstrip().split("<<<EOT")
-        tweet_date = info[0]
-        source = info[2]
-        tweet_fav_count = info[3]
-        retweet_count = info[4]
-        tweet_tupple = (tweet_text, int(tweet_date), source,
-                        int(tweet_fav_count), int(retweet_count))
-        tweet_dict[key.rstrip()] = tweet_tupple
+        tweet_text = (','.join(item[1:])).rstrip().split("<<<EOT")
+        tweet_tupple = (tweet_text, int(info[0]), info[2],
+                        int(info[3]), int(info[4]))
+        tweet_dict[key.rstrip()] = list(tweet_tupple)
     return tweet_dict
 
 
-def most_popular(read_tweets_dict: Dict[str, List[tuple]], date_1: int, date_2: int) -> str:
+def most_popular(read_tweets_dict: Dict[str, List[tuple]],
+                 date_1: int, date_2: int) -> str:
     """Returns username of twitter user who was most popular on twitter
     between date_1 and date_2
     @type read_dict_tweets_dict: Dict[str, List[tupple]]
@@ -200,7 +208,7 @@ def most_popular(read_tweets_dict: Dict[str, List[tuple]], date_1: int, date_2: 
     """
     keys = []
     for key in read_tweets_dict.keys():
-        if read_tweets_dict[key][TWEET_DATE_INDEX] in range(date_1, date_2 + 1):
+        if read_tweets_dict[key][0][TWEET_DATE_INDEX] in range(date_1, date_2 + 1):
             keys.append(key)
     if len(keys) == 0:
         return "tie"
@@ -209,12 +217,11 @@ def most_popular(read_tweets_dict: Dict[str, List[tuple]], date_1: int, date_2: 
     count = 1
     while count < len(keys):
         key = keys[count]
-        if (popularity(key, read_tweets_dict)) >= (popularity(largest_key, read_tweets_dict)):
-            if (popularity(key, read_tweets_dict)) == (popularity(largest_key, read_tweets_dict)):
-                is_multiple = True
-            else:
-                is_multiple = False
-            largest_key = key
+        if ((popularity(key, read_tweets_dict))
+                >= (popularity(largest_key, read_tweets_dict))):
+                is_multiple = ((popularity(key, read_tweets_dict))
+                               == (popularity(largest_key, read_tweets_dict)))
+                largest_key = key
         count += 1
     if is_multiple:
         return "tie"
@@ -228,7 +235,8 @@ def popularity(key: str, read_tweets_dict: Dict[str, List[tuple]]) -> int:
     @type read_tweets_dict: Dict[str,List[tuple]]
     @rtype; int
     """
-    return read_tweets_dict[key][TWEET_FAVOURITE_INDEX] + read_tweets_dict[key][TWEET_RETWEET_INDEX]
+    return read_tweets_dict[key][0][TWEET_FAVOURITE_INDEX] +\
+        read_tweets_dict[key][0][TWEET_RETWEET_INDEX]
 
 
 def detect_author(read_tweets_dict: Dict[str, List[tuple]], text: str) -> str:
@@ -238,16 +246,16 @@ def detect_author(read_tweets_dict: Dict[str, List[tuple]], text: str) -> str:
     @type text: str
     @rtype: str
     """
-    keys = read_tweets_dict.keys()
+    keys = list(read_tweets_dict.keys())
     leading_key = keys[0]
     largest_number = 0
-    for tweet in read_tweets_dict[leading_key][0]:
+    for tweet in read_tweets_dict[leading_key][0][0]:
         largest_number += extract_hashtags(tweet).count(text)
     count = 1
     while count < len(keys):
         key = keys[count]
         number = 0
-        for tweet in read_tweets_dict[key][0]:
+        for tweet in read_tweets_dict[key][0][0]:
             number += extract_hashtags(tweet).count(text)
         if number > largest_number:
             leading_key = key
@@ -259,9 +267,7 @@ def detect_author(read_tweets_dict: Dict[str, List[tuple]], text: str) -> str:
 
 
 if __name__ == '__main__':
-    file = open("tweets_small.txt")
-    read_tweets_dict = read_tweets(file)
-
+    pass
     # If you add any function calls for testing, put them here.
     # Make sure they are indented, so they are within the if statement body.
     # That includes all calls on print, open, and doctest.

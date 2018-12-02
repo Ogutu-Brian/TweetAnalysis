@@ -102,7 +102,7 @@ result = tweets.count_words("#UofT researcher by day, singer @goodkidband by nig
 assert isinstance(result, type(None)), \
     '''tweets.count_words should return None, but returned {0}\n'''.format(type(result))
 assert len(word_d) == 6, \
-    '''tweets.count_words should modify the argument dictionary\n'''
+    '''tweets.count_words should modify the argument dictionary {0}\n'''.format(word_d)
 
 # tweets.common_words
 word_d = {'statement': 10, 'regarding': 1}
