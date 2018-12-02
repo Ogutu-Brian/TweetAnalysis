@@ -165,10 +165,98 @@ def common_words(count_dict:Dict[str,int],N:int) -> None:
     return None
 
 def read_tweets(file: TextIO) -> Dict[str,List[tuple]]:
-    file = open("tweets_smnall.txt")
+    file_content = file.readlines()
+    file_content = list(filter(None,file_content))
+    file.close()
+    content_dict = {}
+    tweet_dict = {}
+    keys = []
+    for line in file_content:
+        if len(line) > 0 and line[len(line) -2] == ":":
+            keys.append(line.lower())
     
+    for key in keys:
+        content_dict[key] = []
+        index = 0
+        for line in file_content:
+            if line.lower() not in keys:
+                content_dict[key].append(line)
+            elif line.lower() in keys and len(content_dict[key]) > 0:
+                break
+            index += 1
+        del file_content[0:index + 1]
+                
+    for key in content_dict:
+        count = 0
+        item = content_dict[key]
+        
+        info = item[0].split(',')
+        tweet_text = ','.join(item[1:])
+        tweet_text = tweet_text.rstrip().split("<<<EOT")
+        tweet_date = info[0]
+        source = info[2]
+        tweet_fav_count = info[3]
+        retweet_count = info[4]
+
+        tweet_tupple = (tweet_text,int(tweet_date),source,int(tweet_fav_count),int(retweet_count))
+        tweet_dict[key.rstrip()] = tweet_tupple
+
+    return tweet_dict
+
+def most_popular(read_tweets_dict: Dict[str,List[tuple]],date_1: int, date_2: int) -> str:
+    keys = []
+    for key in read_tweets_dict.keys():
+        if read_tweets_dict[key][TWEET_DATE_INDEX] in range(date_1,date_2 + 1):
+            keys.append(key)
+    if len(keys) == 0:
+        return "tie"
+
+    largest_key = keys[0]
+    is_multiple = False
+    count = 1
+    while count < len(keys):
+        key = keys[count]
+        if (popularity(key,read_tweets_dict)) >= (popularity(largest_key,read_tweets_dict)):
+            if (popularity(key,read_tweets_dict)) == (popularity(largest_key,read_tweets_dict)):
+                is_multiple = True
+            else:
+                is_multiple = False
+            largest_key = key
+        count += 1
+
+    if is_multiple:
+        return "tie"
+
+    return largest_key
+
+def popularity(key:str,read_tweets_dict: Dict[str,List[tuple]]) -> int:
+    return read_tweets_dict[key][TWEET_FAVOURITE_INDEX] + read_tweets_dict[key][TWEET_RETWEET_INDEX]
+
+def detect_author(read_tweets_dict: Dict[str,List[tuple]],text: str) -> str:
+    keys = read_tweets_dict.keys()
+    leading_key = keys[0]
+    largest_number = 0
+    for tweet in read_tweets_dict[leading_key][0]:
+        largest_number += extract_hashtags(tweet).count(text)
+
+    count = 1
+    
+    while count < len(keys):
+        key = keys[count]
+        number = 0
+        for tweet in read_tweets_dict[key][0]:
+            number += extract_hashtags(tweet).count(text)
+        if number > largest_number:
+            leading_key = key
+            largest_number = number
+        count += 1
+    if largest_number == 0:
+        return "unknown"
+    return leading_key
+      
 if __name__ == '__main__':
-    pass
+    file = open("tweets_small.txt")
+    read_tweets(file)
 
     # If you add any function calls for testing, put them here.
     # Make sure they are indented, so they are within the if statement body.
